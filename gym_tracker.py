@@ -1,17 +1,17 @@
-import streamlit as str
+import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
 
 # إعدادات الصفحة لتكون متوافقة مع الموبايل وإغلاق القائمة الجانبية تلقائياً
-str.set_page_config(
+st.set_page_config(
     page_title="مفكرة التمارين الرياضية السحابية",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
 # تصميم الواجهة وتنسيق النصوص العربية
-str.markdown("""
+st.markdown("""
     <style>
     .reportview-container .main .block-container{ max-width: 90%; }
     h1, h2, h3, p, div { text-align: right; direction: rtl; }
@@ -19,30 +19,30 @@ str.markdown("""
     </style>
     """, unsafe_allowed_html=True)
 
-str.title("🏋️‍♂️ مفكرة التمارين الرياضية السحابية")
-str.subheader("سجل تمارينك من الموبايل وتابعها من كمبيوترك في أي وقت!")
+st.title("🏋️‍♂️ مفكرة التمارين الرياضية السحابية")
+st.subheader("سجل تمارينك من الموبايل وتابعها من كمبيوترك في أي وقت!")
 
 # إنشاء الاتصال بقاعدة البيانات بجوجل شيتس
 try:
-    conn = str.connection("gsheets", type=GSheetsConnection)
+    conn = st.connection("gsheets", type=GSheetsConnection)
     # قراءة البيانات من الورقة الأولى Sheet1
     df = conn.read(worksheet="Sheet1", ttl="5m")
     # تنظيف الخانات الفارغة
     df = df.dropna(how="all")
 except Exception as e:
-    str.error("🔄 جاري إعداد قاعدة البيانات السحابية أو تحديث الاتصال...")
+    st.error("🔄 جاري إعداد قاعدة البيانات السحابية أو تحديث الاتصال...")
     df = pd.DataFrame(columns=["المعرف", "التاريخ", "نوع التمرين", "المدة (دقائق)", "ملاحظات"])
 
 # القائمة الجانبية لإدخال البيانات
-str.sidebar.header("📝 تسجيل نشاط جديد")
+st.sidebar.header("📝 تسجيل نشاط جديد")
 
-with str.sidebar.form(key="exercise_form"):
-    input_date = str.date_input("تاريخ التمرين", datetime.now())
-    input_type = str.selectbox("نوع التمرين", ["حديد / مقاومة", "كارديو / جري", "كرة قدم", "سباحة", "مشي", "أخرى"])
-    input_duration = str.number_input("المدة (بالدقائق)", min_value=1, max_value=300, value=30)
-    input_notes = str.text_area("ملاحظات إضافية...", placeholder="مثال: تمرين رجلين، شدة عالية...")
+with st.sidebar.form(key="exercise_form"):
+    input_date = st.date_input("تاريخ التمرين", datetime.now())
+    input_type = st.selectbox("نوع التمرين", ["حديد / مقاومة", "كارديو / جري", "كرة قدم", "سباحة", "مشي", "أخرى"])
+    input_duration = st.number_input("المدة (بالدقائق)", min_value=1, max_value=300, value=30)
+    input_notes = st.text_area("ملاحظات إضافية...", placeholder="مثال: تمرين رجلين، شدة عالية...")
     
-    submit_button = str.form_submit_button(label="💾 حفظ التمرين سحابياً")
+    submit_button = st.form_submit_button(label="💾 حفظ التمرين سحابياً")
 
 # عند الضغط على زر الحفظ
 if submit_button:
@@ -64,17 +64,17 @@ if submit_button:
         # تحديث ملف الجوجل شيت سحابياً
         conn.update(worksheet="Sheet1", data=updated_df)
         
-        str.sidebar.success("✅ تم حفظ التمرين بنجاح في الـ Google Sheet!")
+        st.sidebar.success("✅ تم حفظ التمرين بنجاح في الـ Google Sheet!")
         # إعادة قراءة البيانات لتحديث الجدول أمام المستخدم
         df = updated_df
     except Exception as error:
-        str.sidebar.error(f"حدث خطأ أثناء الحفظ: {error}")
+        st.sidebar.error(f"حدث خطأ أثناء الحفظ: {error}")
 
 # عرض التمارين المسجلة في الشاشة الرئيسية
-str.header("📊 التمارين المسجلة")
+st.header("📊 التمارين المسجلة")
 
 if df.empty:
-    str.info("💡 لا توجد تمارين مسجلة سحابياً حتى الآن. ابدأ بتسجيل أول تمرين لك من القائمة الجانبية!")
+    st.info("💡 لا توجد تمارين مسجلة سحابياً حتى الآن. ابدأ بتسجيل أول تمرين لك من القائمة الجانبية!")
 else:
     # ترتيب الجدول ليظهر الأحدث في الأعلى
     df_display = df.copy()
@@ -82,4 +82,4 @@ else:
         df_display = df_display.sort_values(by="المعرف", ascending=False)
     
     # عرض الجدول داخل الموقع بتنسيق جميل
-    str.dataframe(df_display, use_container_width=True, hide_index=True)
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
