@@ -1,184 +1,85 @@
-import streamlit as st
+import streamlit as str
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 from datetime import datetime
-import io
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
 
-# إعدادات الصفحة
-st.set_page_config(page_title="مفكرة التمارين", layout="wide", initial_sidebar_state="collapsed")
+# إعدادات الصفحة لتكون متوافقة مع الموبايل وإغلاق القائمة الجانبية تلقائياً
+str.set_page_config(
+    page_title="مفكرة التمارين الرياضية السحابية",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# تطبيق نمط RTL (من اليمين إلى اليسار) للواجهة العربية
-st.markdown("""
+# تصميم الواجهة وتنسيق النصوص العربية
+str.markdown("""
     <style>
-    body, div, p, h1, h2, h3, h4, h5, h6, label, input, button, select {
-        direction: RTL;
-        text-align: right;
-    }
-    .stButton>button {
-        width: 100%;
-    }
+    .reportview-container .main .block-container{ max-width: 90%; }
+    h1, h2, h3, p, div { text-align: right; direction: rtl; }
+    .stButton>button { width: 100%; background-color: #2e7d32; color: white; }
     </style>
-    """, unsafe_allow_html=True)
+    """, unsafe_allowed_html=True)
 
-# الاتصال بقاعدة بيانات جوجل شيتس السحابية
-# ملاحظة: سيقوم Streamlit بالاتصال تلقائياً عبر الإعدادات السحابية
+str.title("🏋️‍♂️ مفكرة التمارين الرياضية السحابية")
+str.subheader("سجل تمارينك من الموبايل وتابعها من كمبيوترك في أي وقت!")
+
+# إنشاء الاتصال بقاعدة البيانات بجوجل شيتس
 try:
-    conn = st.connection("gsheets", type="sheets")
-    # قراءة البيانات (تأكد من تسمية الورقة الأولى بـ Sheet1 أو تعديلها بالأسفل)
-    df = conn.read(ttl="0")
-    # إذا كانت الورقة فارغة، نقوم بتجهيز الأعمدة الأساسية
-    if df.empty or len(df.columns) < 5:
-        df = pd.DataFrame(columns=["المعرف", "التاريخ", "نوع التمرين", "المدة (دقائق)", "ملاحظات"])
+    conn = str.connection("gsheets", type=GSheetsConnection)
+    # قراءة البيانات من الورقة الأولى Sheet1
+    df = conn.read(worksheet="Sheet1", ttl="5m")
+    # تنظيف الخانات الفارغة
+    df = df.dropna(how="all")
 except Exception as e:
-    st.error("جاري الاتصال بقاعدة البيانات السحابية أو إعدادها لأول مرة...")
+    str.error("🔄 جاري إعداد قاعدة البيانات السحابية أو تحديث الاتصال...")
     df = pd.DataFrame(columns=["المعرف", "التاريخ", "نوع التمرين", "المدة (دقائق)", "ملاحظات"])
 
-st.title("🏋️‍♂️ مفكرة التمارين الرياضية السحابية")
-st.write("سجل تمارينك من الموبايل في النادي وتابعها من كمبيوترك في أي وقت!")
+# القائمة الجانبية لإدخال البيانات
+str.sidebar.header("📝 تسجيل نشاط جديد")
 
-# سحب جانبي لإدخال البيانات
-with st.sidebar:
-    st.header("📝 تسجيل نشاط جديد")
+with str.sidebar.form(key="exercise_form"):
+    input_date = str.date_input("تاريخ التمرين", datetime.now())
+    input_type = str.selectbox("نوع التمرين", ["حديد / مقاومة", "كارديو / جري", "كرة قدم", "سباحة", "مشي", "أخرى"])
+    input_duration = str.number_input("المدة (بالدقائق)", min_value=1, max_value=300, value=30)
+    input_notes = str.text_area("ملاحظات إضافية...", placeholder="مثال: تمرين رجلين، شدة عالية...")
     
-    # نموذج الإدخال
-    input_date = st.date_input("تاريخ التمرين", datetime.now().date())
-    exercise_type = st.selectbox("نوع التمرين", ["حديد / مقاومة", "كارديو (جري/مشي)", "سباحة", "كرة قدم", "لياقة بدنية / سويدي", "أخرى"])
-    duration = st.number_input("المدة (بالدقائق)", min_value=1, max_value=300, value=45, step=5)
-    notes = st.text_area("ملاحظات إضافية", placeholder="مثال: تمرین رجلين، شدة عالية...")
-    
-    submit_button = st.button("💾 حفظ التمرين سحابياً")
+    submit_button = str.form_submit_button(label="💾 حفظ التمرين سحابياً")
 
-# معالجة إضافة تمرين جديد
+# عند الضغط على زر الحفظ
 if submit_button:
-    # توليد معرف فريد يعتمد على الوقت الحالي لمنع التكرار وتسهيل الحذف
-    unique_id = datetime.now().strftime("%Y%m%d%H%M%S")
-    
-    new_data = pd.DataFrame({
-        "المعرف": [unique_id],
-        "التاريخ": [str(input_date)],
-        "نوع التمرين": [exercise_type],
-        "المدة (دقائق)": [int(duration)],
-        "ملاحظات": [notes]
-    })
-    
-    # دمج البيانات وتحديث الجوجل شيتس سحابياً
-    updated_df = pd.concat([df, new_data], ignore_value=True) if not df.empty else new_data
-    
     try:
-        conn.update(data=updated_df)
-        st.sidebar.success("✅ تم حفظ التمرين في قاعدة البيانات السحابية!")
-        st.rerun()
-    except Exception as e:
-        st.sidebar.error(f"حدث خطأ أثناء الحفظ السحابي: {e}")
+        # تجهيز السطر الجديد لتسجيله
+        new_id = int(df["المعرف"].max() + 1) if not df.empty and pd.notna(df["المعرف"].max()) else 1
+        
+        new_row = pd.DataFrame([{
+            "المعرف": new_id,
+            "التاريخ": input_date.strftime("%Y-%m-%d"),
+            "نوع التمرين": input_type,
+            "المدة (دقائق)": int(input_duration),
+            "ملاحظات": input_notes if input_notes else "-"
+        }])
+        
+        # دمج السطر الجديد مع البيانات السابقة
+        updated_df = pd.concat([df, new_row], ignore_index=True)
+        
+        # تحديث ملف الجوجل شيت سحابياً
+        conn.update(worksheet="Sheet1", data=updated_df)
+        
+        str.sidebar.success("✅ تم حفظ التمرين بنجاح في الـ Google Sheet!")
+        # إعادة قراءة البيانات لتحديث الجدول أمام المستخدم
+        df = updated_df
+    except Exception as error:
+        str.sidebar.error(f"حدث خطأ أثناء الحفظ: {error}")
 
-# عرض البيانات والإحصائيات في الصفحة الرئيسية
-st.header("📊 سجل التمارين المسجلة")
+# عرض التمارين المسجلة في الشاشة الرئيسية
+str.header("📊 التمارين المسجلة")
 
-if not df.empty and len(df) > 0:
-    # عرض إحصائيات سريعة
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("إجمالي التمارين", f"{len(df)} تمارين")
-    with col2:
-        st.metric("مجموع الدقائق الرياضية", f"{int(df['المدة (دقائق)'].astype(int).sum())} دقيقة")
-    with col3:
-        st.metric("أكثر تمرين تكراراً", df["نوع التمرين"].mode()[0] if not df["نوع التمرين"].empty else "غير محدد")
-    
-    st.write("---")
-    
-    # عرض الجدول مع زر حذف لكل سطر
-    # نقوم بعمل حلقة لعرض الأسطر بشكل منسق مع خيار الحذف
-    for index, row in df.iterrows():
-        # إنشاء حاوية لكل تمرين تظهر بشكل بطاقة منسقة
-        with st.container():
-            c1, c2, c3, c4, c5 = st.columns([2, 3, 2, 4, 1.5])
-            with c1:
-                st.write(f"📅 **{row['التاريخ']}**")
-            with c2:
-                st.write(f"💪 **{row['نوع التمرين']}**")
-            with c3:
-                st.write(f"⏱️ **{row['المدة (دقائق)']} دقيقة**")
-            with c4:
-                st.write(f"📝 {row['ملاحظات'] if pd.notna(row['ملاحظات']) else '-'}")
-            with c5:
-                # زر الحذف يعتمد على المعرف الفريد للسطر
-                delete_clicked = st.button("🗑️ حذف", key=f"del_{row['المعرف']}")
-                if delete_clicked:
-                    # حذف السطر بناءً على المعرف فريد
-                    updated_df = df[df["المعرف"] != row["المعرف"]]
-                    try:
-                        conn.update(data=updated_df)
-                        st.success("🗑️ تم حذف التمرين بنجاح سحابياً!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"خطأ أثناء الحذف: {e}")
-        st.markdown("<hr style='margin:0.5em 0px; border-color:#eee;'>", unsafe_allow_html=True)
-
-    # 📥 بناء ملف الإكسل الاحترافي المنسق للتحميل
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "سجل التمارين الرياضية"
-    ws.views.sheetView[0].rightToLeft = True  # جعل الملف من اليمين إلى اليسار ناتيف
-
-    # تجهيز الداتا فريم للتصدير بدون عمود المعرف الفريد لإبقاء المظهر نظيفاً
-    export_df = df.drop(columns=["المعرف"])
-    
-    # كتابة العناوين وتنسيقها
-    for r in dataframe_to_rows(export_df, index=False, header=True):
-        ws.append(r)
-
-    # الألوان والتنسيقات
-    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    header_font = Font(name="Arial", size=12, bold=True, color="FFFFFF")
-    data_font = Font(name="Arial", size=11, color="000000")
-    center_align = Alignment(horizontal="center", vertical="center")
-    right_align = Alignment(horizontal="right", vertical="center")
-    
-    thin_border = Border(
-        left=Side(style='thin', color='D9D9D9'),
-        right=Side(style='thin', color='D9D9D9'),
-        top=Side(style='thin', color='D9D9D9'),
-        bottom=Side(style='thin', color='D9D9D9')
-    )
-
-    # تطبيق التنسيق على الصف الأول (العناوين)
-    for cell in ws[1]:
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = center_align
-        cell.border = thin_border
-    ws.row_dimensions[1].height = 28
-
-    # تطبيق التنسيقات على بقية أسطر البيانات
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-        for cell in row:
-            cell.font = data_font
-            cell.border = thin_border
-            if cell.column in [1, 3]:  # التاريخ والمدة في المنتصف
-                cell.alignment = center_align
-            else:
-                cell.alignment = right_align
-        ws.row_dimensions[row[0].row].height = 22
-
-    # ضبط تلقائي لعرض الأعمدة بناءً على المحتوى لتجنب اختفاء النصوص
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = col[0].column_letter
-        ws.column_dimensions[col_letter].width = max(max_len + 5, 15)
-
-    # تحويل ملف الإكسل المنسق إلى سيل من البايتات ليدعم تحميله عبر المتصفح مباشرة
-    excel_buffer = io.BytesIO()
-    wb.save(excel_buffer)
-    excel_buffer.seek(0)
-
-    st.write(" ")
-    st.download_button(
-        label="📥 تحميل سجل التمارين كاملاً كملف Excel منسق",
-        data=excel_buffer,
-        file_name=f"gym_activities_{datetime.now().strftime('%Y%m%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+if df.empty:
+    str.info("💡 لا توجد تمارين مسجلة سحابياً حتى الآن. ابدأ بتسجيل أول تمرين لك من القائمة الجانبية!")
 else:
-    st.info("💡 لا توجد تمارين مسجلة سحابياً حتى الآن. ابدأ بتسجيل أول تمرين لك من القائمة الجانبية!")
+    # ترتيب الجدول ليظهر الأحدث في الأعلى
+    df_display = df.copy()
+    if "المعرف" in df_display.columns:
+        df_display = df_display.sort_values(by="المعرف", ascending=False)
+    
+    # عرض الجدول داخل الموقع بتنسيق جميل
+    str.dataframe(df_display, use_container_width=True, hide_index=True)
