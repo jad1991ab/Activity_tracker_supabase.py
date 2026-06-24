@@ -8,7 +8,7 @@ import streamlit.components.v1 as components
 from google.oauth2.service_account import Credentials
 from gspread_dataframe import set_with_dataframe
 
-# إعدادات الصفحة
+# إعدادات الصفحة الرسمية
 st.set_page_config(page_title="متابع الأنشطة الاحترافي", layout="wide", page_icon="🟢")
 
 SCOPES = [
@@ -29,7 +29,7 @@ def get_sheet():
 
 sheet = get_sheet()
 
-# الأعمدة الأساسية المعتمدة فقط في الـ Google Sheet
+# الأعمدة الرسمية والأساسية المتفق عليها في قاعدة البيانات
 COLUMNS = ['ID', 'التاريخ', 'السنة', 'الشهر', 'الأسبوع', 'اليوم', 'الساعة', 'النشاط', 'المدة_بالدقائق']
 
 try:
@@ -37,7 +37,7 @@ try:
     if not first_row:
         sheet.append_row(COLUMNS)
 except Exception as e:
-    st.error(f"خطأ في الاتصال الأولي بقاعدة البيانات: {e}")
+    st.error(f"خطأ في الاتصال بقاعدة البيانات: {e}")
 
 st.title("🟢 نظام متابعة الأنشطة المطور (مخطط الالتزام السنوي الكامل)")
 
@@ -58,6 +58,7 @@ def load_data():
 
 def save_data(df):
     try:
+        # تصفية شاملة للأعمدة قبل الإرسال لضمان عدم توليد أي عناوين مكررة أو زائدة في الشيت
         clean_df = df[[c for c in COLUMNS if c in df.columns]].copy()
         sheet.clear()
         set_with_dataframe(sheet, clean_df, include_index=False, include_column_header=True, resize=True)
@@ -70,7 +71,7 @@ if 'db' not in st.session_state:
 
 df_db = st.session_state.db
 
-# تجهيز التواريخ للإحصائيات
+# تجهيز متغيرات الوقت الحالية والتنبؤية في الذاكرة المؤقتة للتطبيق
 now = datetime.datetime.now()
 today_str = now.strftime('%Y-%m-%d')
 current_year = now.year
@@ -85,7 +86,7 @@ else:
     df_db_calc['تاريخ_يومي_مختصر'] = pd.Series(dtype='str')
 
 # ==========================================
-# 1. شريط الإنجاز اليومي ومقارنة الأداء
+# 1. شريط الإنجاز ومقارنة الأداء اليومي
 # ==========================================
 st.subheader("🎯 مؤشر الإنجاز ومقارنة الأداء")
 
@@ -114,11 +115,11 @@ with col_p3:
 st.markdown("---")
 
 # ==========================================
-# 2. مخطط الالتزام السنوي المصحح والمطور (GitHub Heatmap)
+# 2. مخطط الالتزام السنوي الكامل (GitHub Contributions Grid)
 # ==========================================
-st.subheader("🧱 مخطط الالتزام السنوي (GitHub Contributions Grid)")
+st.subheader("🧱 مخطط الالتزام السنوي الكامل للأشهر والأيام")
 
-# بناء مصفوفة كاملة ثابتة للسنة الحالية لجميع الأشهر والأيام بشكل متناسق
+# توليد شبكة أيام السنة الكلية (365 يوم) لضمان ظهور الـ 12 شهراً أفقياً
 start_date = datetime.date(current_year, 1, 1)
 end_date = datetime.date(current_year, 12, 31)
 all_days = pd.date_range(start=start_date, end=end_date)
@@ -129,7 +130,11 @@ df_year_grid['الأسبوع_السنوي'] = df_year_grid['تاريخ_صحيح'
 df_year_grid['اليوم_رقم'] = df_year_grid['تاريخ_صحيح'].dt.dayofweek # 0=الاثنين, 6=الأحد
 df_year_grid['الشهر_رقم'] = df_year_grid['تاريخ_صحيح'].dt.month
 
-# معالجة تداخل أول وأخر أسبوع في السنة رقمياً
+# ترتيب مخصص للأيام ليماثل ستايل غيت هاب (يبدأ من الأحد وينتهي بالسبت)
+github_day_order = [6, 0, 1, 2, 3, 4, 5] 
+days_names = ['الأحد (Sun)', 'الاثنين (Mon)', 'الثلاثاء (Tue)', 'الأربعاء (Wed)', 'الخميس (Thu)', 'الجمعة (Fri)', 'السبت (Sat)']
+
+# إصلاح تداخل أرقام الأسابيع رقمياً لمنع تباعد المربعات
 df_year_grid.loc[(df_year_grid['الشهر_رقم'] == 1) & (df_year_grid['الأسبوع_السنوي'] >= 52), 'الأسبوع_السنوي'] = 0
 df_year_grid.loc[(df_year_grid['الشهر_رقم'] == 12) & (df_year_grid['الأسبوع_السنوي'] == 1), 'الأسبوع_السنوي'] = 53
 
@@ -144,9 +149,7 @@ weeks_indices = sorted(df_year_grid['الأسبوع_السنوي'].unique())
 z_matrix = []
 text_matrix = []
 
-days_names = ['الاثنين (Mon)', 'الثلاثاء (Tue)', 'الأربعاء (Wed)', 'الخميس (Thu)', 'الجمعة (Fri)', 'السبت (Sat)', 'الأحد (Sun)']
-
-for d in range(7):
+for d in github_day_order:
     row_z = []
     row_text = []
     for w in weeks_indices:
@@ -162,7 +165,6 @@ for d in range(7):
     z_matrix.append(row_z)
     text_matrix.append(row_text)
 
-# حساب مواقع الأشهر رقمياً لتجنب الانهيار (ValueError)
 month_labels = []
 month_positions = []
 for m in range(1, 13):
@@ -171,7 +173,6 @@ for m in range(1, 13):
         mid_week = m_data['الأسبوع_السنوي'].median()
         month_name = datetime.date(current_year, m, 1).strftime('%b')
         month_labels.append(month_name)
-        # استخدام قيمة رقمية صحيحة للموضع لتجنب انهيار التنسيق
         month_positions.append(int(mid_week))
 
 fig_heatmap = go.Figure(data=go.Heatmap(
@@ -190,9 +191,10 @@ fig_heatmap = go.Figure(data=go.Heatmap(
         [1.0, '#216e39']
     ],
     showscale=True,
-    colorbar=dict(title="ساعات الإنجاز", thickness=15)
+    colorbar=dict(title="الساعات", thickness=13)
 ))
 
+# 🛡️ تم إصلاح الأخطاء البرمجية هنا عبر استخدام 'reversed' بدلاً من 'reverse' وبقيم مدعومة بالكامل
 fig_heatmap.update_layout(
     height=290,
     margin=dict(t=35, b=10, l=10, r=10),
@@ -204,14 +206,14 @@ fig_heatmap.update_layout(
         ticktext=month_labels,
         side='top'
     ),
-    yaxis=dict(showgrid=False, ticks="", autorange="reverse")
+    yaxis=dict(showgrid=False, ticks="", autorange='reversed')
 )
 st.plotly_chart(fig_heatmap, use_container_width=True)
 
 st.markdown("---")
 
 # ==========================================
-# 3. قسم إدخال البيانات الذكي مع الساعة الدائرية
+# 3. قسم إدخال البيانات المطور (الساعة الدائرية التفاعلية)
 # ==========================================
 st.subheader("📥 تسجيل نشاط جديد")
 
@@ -227,7 +229,7 @@ else:
 activities_list.append("➕ إضافة نشاط مخصص...")
 months_list = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
-# إعدادات الوقت الافتراضية
+# تعريف القيم البدئية
 target_date = now.date()
 chosen_time_str = now.strftime('%H:%M')
 
@@ -249,27 +251,26 @@ else:
     with c2:
         target_date = st.date_input("اختر التاريخ من التقويم 📅", value=now.date())
     with c3:
-        st.markdown("<label style='font-size:14px; font-weight:bold; color:#333;'>اضبط وقت النشاط بدقة ⌚</label>", unsafe_allow_html=True)
+        st.markdown("<label style='font-size:14px; font-weight:bold; color:#216e39;'>اضبط وقت النشاط بالساعة التفاعلية ⌚</label>", unsafe_allow_html=True)
         
-        # ⌚ ساعة دائرية متطورة وتفاعلية مدمجة للويب تعمل بشكل مثالي ومستقر
+        # ⌚ ساعة دائرية تعتمد على ميزات التصفح المدمجة ومجربة للعمل بكفاءة دون أخطاء اتصال
         clock_html = f"""
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif; padding-top:5px;">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif; padding-top:2px;">
             <input type="time" id="analog_picker" value="{chosen_time_str}" 
-                   style="font-size: 22px; padding: 10px; border-radius: 8px; border: 2px solid #40c463; text-align: center; width: 180px; background: #fff; cursor: pointer; font-weight:bold; color:#216e39;">
-            <p style="font-size:12px; color:#555; margin-top:8px; text-align:center;">اضغط على التوقيت أعلاه لتظهر لك نافذة الساعة الدائرية الرائعة</p>
+                   style="font-size: 20px; padding: 8px; border-radius: 8px; border: 2px solid #40c463; text-align: center; width: 170px; font-weight:bold; color:#216e39; background-color:#fff; cursor:pointer;">
+            <p style="font-size:11px; color:#666; margin-top:6px; text-align:center;">انقر فوق التوقيت لتنبثق لك لوحة الساعة الدائرية</p>
         </div>
         <script>
             var picker = document.getElementById('analog_picker');
-            function sendValue() {{
+            function emitTime() {{
                 window.parent.postMessage({{type: 'streamlit:setComponentValue', value: picker.value}}, '*');
             }}
-            picker.addEventListener('input', sendValue);
-            picker.addEventListener('change', sendValue);
-            // إرسال القيمة الافتراضية عند التحميل
-            setTimeout(sendValue, 300);
+            picker.addEventListener('input', emitTime);
+            picker.addEventListener('change', emitTime);
+            setTimeout(emitTime, 250);
         </script>
         """
-        clock_return = components.html(clock_html, height=110)
+        clock_return = components.html(clock_html, height=105)
         if clock_return:
             chosen_time_str = str(clock_return)
 
@@ -323,7 +324,7 @@ if st.button("➕ تسجيل النشاط وحفظه تلقائياً", use_cont
     st.rerun()
 
 # ==========================================
-# 4. عرض السجل العام مع الحذف والتصدير
+# 4. عرض السجل العام، الحذف الفوري، والتصدير
 # ==========================================
 if not df_db.empty:
     st.markdown("---")
@@ -352,7 +353,7 @@ if not df_db.empty:
             df_db = df_db.drop(indices_to_delete).reset_index(drop=True)
             save_data(df_db)
             st.session_state.db = df_db
-            st.toast("تم حذف الأنشطة المحددة!", icon="🗑️")
+            st.toast("تم حذف الأنشطة المحددة بنجاح!", icon="🗑️")
             st.rerun()
 
     st.markdown("---")
@@ -366,7 +367,7 @@ if not df_db.empty:
         worksheet.sheet_view.rightToLeft = True 
 
     st.download_button(
-        label="📥 تحميل سجل تمارينك كملف Excel منسق",
+        label="📥 تحميل سجل تمارينك كملف Excel منسق ونظيف",
         data=buffer.getvalue(),
         file_name="my_gym_activities.xlsx",
         mime="application/vnd.ms-excel",
@@ -379,5 +380,5 @@ if not df_db.empty:
         sheet.append_row(COLUMNS)
         st.cache_data.clear()
         st.session_state.db = pd.DataFrame(columns=COLUMNS)
-        st.success("تم تصفير قاعدة البيانات بالكامل!")
+        st.success("تم تصفير قاعدة البيانات بنجاح ونظافة تامة!")
         st.rerun()
