@@ -86,13 +86,39 @@ else:
     df_db_calc['تاريخ_يومي_مختصر'] = pd.Series(dtype='str')
 
 # ==========================================
+# 🎨 تحسين 1: قاموس الأيقونات التلقائية للأنشطة
+# ==========================================
+ACTIVITY_EMOJIS = {
+    "النادي": "🏋️‍♂️",
+    "الدراسة": "📚",
+    "العمل": "💼",
+    "القراءة": "📖",
+    "الجري": "🏃‍♂️",
+    "برمجة": "💻",
+    "تأمل": "🧘‍♂️"
+}
+
+def get_activity_with_emoji(activity_name):
+    """إضافة إيموجي تلقائي لاسم النشاط إذا لم يكن يحتوي على واحد بالفعل"""
+    name_clean = activity_name.strip()
+    # إذا كان النشاط يحتوي بالفعل على إيموجي، اتركه كما هو
+    if any(char in name_clean for char in ["🏋️‍♂️", "📚", "💼", "📖", "🏃‍♂️", "💻", "🧘‍♂️", "➕"]):
+        return name_clean
+    
+    # البحث في القاموس عن كلمة مفتاحية مطابقة
+    for key, emoji in ACTIVITY_EMOJIS.items():
+        if key in name_clean:
+            return f"{name_clean} {emoji}"
+    return name_clean
+
+# ==========================================
 # نظام التنقل الجانبي (Navigation)
 # ==========================================
 st.sidebar.title("🧭 قائمة التنقل")
 page = st.sidebar.radio("اختر الصفحة:", ["📥 تسجيل نشاط جديد", "📊 لوحة التحكم والإحصاءات"])
 
 # ==========================================
-# حساب الإحصائيات (مطلوب للصفحتين أو للحساب العام)
+# حساب الإحصائيات (مطلوب للحساب العام)
 # ==========================================
 DAILY_GOAL = 2        # ساعة
 WEEKLY_GOAL = 14      # ساعة
@@ -168,11 +194,17 @@ if page == "📥 تسجيل نشاط جديد":
     else:
         activities_list = default_activities
 
-    activities_list.append("➕ إضافة نشاط مخصص...")
+    if "➕ إضافة نشاط مخصص..." not in activities_list:
+        activities_list.append("➕ إضافة نشاط مخصص...")
+        
     months_list = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
     target_date = now.date()
     chosen_time_str = now.strftime('%H:%M')
+
+    # تهيئة حالة الجلسة (Session State) لزر التوقيت السريع إن لم تكن موجودة
+    if "duration_input" not in st.session_state:
+        st.session_state.duration_input = 1.0
 
     if auto_time:
         c1, c2 = st.columns(2)
@@ -181,14 +213,54 @@ if page == "📥 تسجيل نشاط جديد":
             if selected_activity == "➕ إضافة نشاط مخصص...":
                 custom_activity = st.text_input("اكتب اسم النشاط الجديد هنا:")
         with c2:
-            duration_hours = st.number_input("مدة النشاط (بالساعات)", min_value=0.1, max_value=24.0, value=1.0, step=0.5)
+            duration_hours = st.number_input("مدة النشاط (بالساعات)", min_value=0.1, max_value=24.0, step=0.5, key="duration_input")
+            
+            # ⏱️ تحسين 2: أزرار التوقيت السريعة (Quick Timers)
+            st.caption("⏱️ أزرار التوقيت السريعة:")
+            b1, b2, b3, b4 = st.columns(4)
+            with b1:
+                if st.button("⏱️ 30 د", use_container_width=True):
+                    st.session_state.duration_input = 0.5
+                    st.rerun()
+            with b2:
+                if st.button("⏱️ 1 ساعة", use_container_width=True):
+                    st.session_state.duration_input = 1.0
+                    st.rerun()
+            with b3:
+                if st.button("⏱️ 1.5 س", use_container_width=True):
+                    st.session_state.duration_input = 1.5
+                    st.rerun()
+            with b4:
+                if st.button("⏱️ 2 ساعتين", use_container_width=True):
+                    st.session_state.duration_input = 2.0
+                    st.rerun()
     else:
         c1, c2, c3 = st.columns([2, 1.5, 1.5])
         with c1:
             selected_activity = st.selectbox("النشاط", activities_list)
             if selected_activity == "➕ إضافة نشاط مخصص...":
                 custom_activity = st.text_input("اكتب اسم النشاط الجديد هنا:")
-            duration_hours = st.number_input("المدة (بالساعات)", min_value=0.1, max_value=24.0, value=1.0, step=0.5)
+            duration_hours = st.number_input("المدة (بالساعات)", min_value=0.1, max_value=24.0, step=0.5, key="duration_input")
+            
+            # أزرار التوقيت السريعة في الوضع اليدوي أيضاً
+            st.caption("⏱️ أزرار التوقيت السريعة:")
+            b1, b2, b3, b4 = st.columns(4)
+            with b1:
+                if st.button("⏱️ 30 د", use_container_width=True, key="m1"):
+                    st.session_state.duration_input = 0.5
+                    st.rerun()
+            with b2:
+                if st.button("⏱️ 1 ساعة", use_container_width=True, key="m2"):
+                    st.session_state.duration_input = 1.0
+                    st.rerun()
+            with b3:
+                if st.button("⏱️ 1.5 س", use_container_width=True, key="m3"):
+                    st.session_state.duration_input = 1.5
+                    st.rerun()
+            with b4:
+                if st.button("⏱️ 2 ساعتين", use_container_width=True, key="m4"):
+                    st.session_state.duration_input = 2.0
+                    st.rerun()
         with c2:
             target_date = st.date_input("اختر التاريخ من التقويم 📅", value=now.date())
         with c3:
@@ -216,12 +288,12 @@ if page == "📥 تسجيل نشاط جديد":
     if st.button("➕ تسجيل النشاط وحفظه تلقائياً", use_container_width=True, type="primary"):
         if selected_activity == "➕ إضافة نشاط مخصص...":
             if 'custom_activity' in locals() and custom_activity.strip() != "":
-                final_activity = custom_activity.strip()
+                final_activity = get_activity_with_emoji(custom_activity.strip())
             else:
                 st.error("يرجى كتابة اسم النشاط المخصص أولاً!")
                 st.stop()
         else:
-            final_activity = selected_activity
+            final_activity = get_activity_with_emoji(selected_activity)
 
         if auto_time:
             target_time = now.time()
@@ -327,7 +399,6 @@ if page == "📥 تسجيل نشاط جديد":
 elif page == "📊 لوحة التحكم والإحصاءات":
     st.header("📊 لوحة التحكم والأداء العام")
     
-    # تحفيز بناءً على السلسلة الحالية
     if current_streak >= 30:
         st.success("🏆 أداء مذهل! لديك سلسلة التزام تتجاوز 30 يوماً.")
     elif current_streak >= 14:
@@ -392,7 +463,7 @@ elif page == "📊 لوحة التحكم والإحصاءات":
     st.markdown("---")
 
     # الرسوم البيانية
-    st.sidebar.markdown("---") # نقل خيار وضع الهاتف للجانب أيضاً
+    st.sidebar.markdown("---")
     if st.sidebar.checkbox("وضع الهاتف في الرسوم البيانية", value=True):
         col_graph1 = st.container()
         col_graph2 = st.container()
@@ -461,9 +532,12 @@ elif page == "📊 لوحة التحكم والإحصاءات":
             showscale=False
         ))
 
+        # 🌓 تحسين 3: جعل خلفية المخطط الحراري شفافة لتتناسب تلقائياً مع المظهر الداكن/المضيء
         fig_heatmap.update_layout(
             height=420,
             margin=dict(t=40, b=10, l=5, r=5),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(showgrid=False, ticks="", tickmode='array', tickvals=month_positions, ticktext=month_labels, side='top', tickfont=dict(size=10)),
             yaxis=dict(showgrid=False, ticks="", autorange='reversed', tickfont=dict(size=10))
         )
@@ -475,7 +549,15 @@ elif page == "📊 لوحة التحكم والإحصاءات":
             pie_data = df_db_calc.groupby('النشاط')['المدة_بالدقائق'].sum().reset_index()
             fig_pie = px.pie(pie_data, values='المدة_بالدقائق', names='النشاط', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
             fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-            fig_pie.update_layout(height=280, margin=dict(t=10, b=10, l=10, r=10), showlegend=False)
+            
+            # 🌓 تحسين 3: جعل خلفية المخطط الدائري شفافة
+            fig_pie.update_layout(
+                height=280, 
+                margin=dict(t=10, b=10, l=10, r=10), 
+                showlegend=False,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)'
+            )
             st.plotly_chart(fig_pie, use_container_width=True)
         else:
             st.info("سيتوفر الرسم الدائري فور تسجيل الأنشطة.")
@@ -495,14 +577,22 @@ elif page == "📊 لوحة التحكم والإحصاءات":
         trend["الساعات"] = trend["المدة_بالدقائق"] / 60
 
         fig_line = px.line(trend, x="date_only", y="الساعات", markers=True, title="آخر 30 يوماً")
-        fig_line.update_layout(height=350, xaxis_title="التاريخ", yaxis_title="عدد الساعات", margin=dict(l=10, r=10, t=40, b=10))
+        
+        # 🌓 تحسين 3: جعل خلفية مخطط الخطوط شفافة
+        fig_line.update_layout(
+            height=350, 
+            xaxis_title="التاريخ", 
+            yaxis_title="عدد الساعات", 
+            margin=dict(l=10, r=10, t=40, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
+        )
         st.plotly_chart(fig_line, use_container_width=True, config={"displayModeBar": False})
     else:
         st.info("لا توجد بيانات كافية لعرض المخطط.")
 
     st.markdown("---")
     
-    # قسم الإنجازات والأوسمة (Achievements)
     st.subheader("🏆 الأوسمة والإنجازات المفتوحة")
     completed = sum(1 for _, _, unlocked in achievements if unlocked)
     st.progress(completed / len(achievements))
