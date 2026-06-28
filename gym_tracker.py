@@ -46,6 +46,7 @@ def get_sheet_and_init():
         
     return worksheet
 
+# استدعاء قاعدة البيانات
 try:
     sheet = get_sheet_and_init()
 except Exception as e:
@@ -84,13 +85,24 @@ if 'db' not in st.session_state:
 
 df_db = st.session_state.db
 
+# تجهيز متغيرات الوقت الحالية الأساسية
 now = datetime.datetime.now()
 today_str = now.strftime('%Y-%m-%d')
 current_year = now.year
 
-# تهيئة متغير إدخال المدة برمجياً لمنع تعطل الأزرار وساعة الإيقاف
+# 🧠 [إصلاح] تهيئة وإدارة متغير المدة في الـ Session State في أعلى الملف قبل بناء أي عنصر واجهة
 if "duration_input" not in st.session_state:
     st.session_state.duration_input = 1.0
+
+if "stopwatch_running" not in st.session_state:
+    st.session_state.stopwatch_running = False
+    st.session_state.stopwatch_start = None
+    st.session_state.elapsed_time = 0
+
+# دالة ذكية لتحديث قيمة المدة من الأزرار السريعة بأمان
+def update_duration_callback(target_value):
+    st.session_state.duration_input = float(target_value)
+
 
 # ==========================================
 # 🧭 نظام القوائم والتنقل
@@ -98,8 +110,6 @@ if "duration_input" not in st.session_state:
 st.sidebar.title("🧭 قائمة التنقل")
 page = st.sidebar.radio("اختر الصفحة:", ["📥 تسجيل نشاط جديد", "📊 لوحة التحكم والإحصاءات"])
 
-def update_duration(target_value):
-    st.session_state.duration_input = float(target_value)
 
 # ==========================================
 # 1. صفحة: تسجيل نشاط جديد
@@ -107,14 +117,10 @@ def update_duration(target_value):
 if page == "📥 تسجيل نشاط جديد":
     st.header("🟢 نظام تسجيل ومتابعة الأنشطة")
     
+    # ساعة الإيقاف التفاعلية الذكية
     st.markdown("### ⏱️ ساعة الإيقاف والتركيز الحي")
     stop_col1, stop_col2 = st.columns([2, 1])
     
-    if "stopwatch_running" not in st.session_state:
-        st.session_state.stopwatch_running = False
-        st.session_state.stopwatch_start = None
-        st.session_state.elapsed_time = 0
-
     with stop_col1:
         if not st.session_state.stopwatch_running:
             if st.button("▶️ ابدأ نشاط حياً الآن (تشغيل العداد المستمر)", use_container_width=True):
@@ -122,17 +128,17 @@ if page == "📥 تسجيل نشاط جديد":
                 st.session_state.stopwatch_start = time.time() - st.session_state.elapsed_time
                 st.rerun()
         else:
+            # تحديث الوقت الحالي المنقضي
             st.session_state.elapsed_time = time.time() - st.session_state.stopwatch_start
             if st.button("⏸️ إنهاء النشاط المباشر وتعبئة الوقت المكتسب تلقائياً", use_container_width=True, type="primary"):
                 st.session_state.stopwatch_running = False
                 
-                # حساب الساعات بدقة وتحويلها لكسر عشري دقيق (مثال: 45 دقيقة تظهر 0.75 ساعة)
+                # حساب الساعات بدقة متناهية
                 calc_hours = round(st.session_state.elapsed_time / 3600, 2)
-                
-                # إذا كان الوقت المسجل صغير جداً (أقل من دقيقة)، نضع حد أدنى 0.1 لتفادي أخطاء الحقول الرقمية
+                # وضع حد أدنى 0.1 ساعة لتفادي الأخطاء إذا كانت التجربة لثوانٍ معدودة
                 st.session_state.duration_input = max(calc_hours, 0.1)
                 
-                st.toast(f"📥 تم تحديث الحقل الرقمي بالأسفل بـ {st.session_state.duration_input} ساعة!", icon="⏱️")
+                st.toast(f"📥 تم تحديث حقل المدة بالأسفل بـ {st.session_state.duration_input} ساعة!", icon="⏱️")
                 st.rerun()
                 
     with stop_col2:
@@ -177,16 +183,16 @@ if page == "📥 تسجيل نشاط جديد":
             selected_activity = st.selectbox("النشاط", activities_list)
             if selected_activity == "➕ إضافة نشاط مخصص...":
                 custom_activity = st.text_input("اكتب اسم النشاط الجديد هنا:")
-            activity_notes = st.text_input("✍️ ملاحظات وتعليقات على النشاط (اختياري):", placeholder="مثال: تمرين أكتاف، قراءة الكتاب")
+            activity_notes = st.text_input("✍️ ملاحظات وتعليقات على النشاط (اختياري):", placeholder="مثال: تمرين أرجل، إنهاء الفصل الثالث")
         with c2:
-            # استخدام المفتاح الثابت المرتبط بالـ session state لحل المشكلة جذرياً
+            # ربط آمن ومباشر مع الـ Session State لحل مشكلة التجميد
             duration_hours = st.number_input("مدة النشاط (بالساعات)", min_value=0.1, max_value=24.0, step=0.05, key="duration_input")
             st.caption("⏱️ أزرار تعيين الوقت السريعة:")
             b1, b2, b3, b4 = st.columns(4)
-            with b1: st.button("⏱️ 30 د", use_container_width=True, on_click=update_duration, args=(0.5,))
-            with b2: st.button("⏱️ 1 ساعة", use_container_width=True, on_click=update_duration, args=(1.0,))
-            with b3: st.button("⏱️ 1.5 س", use_container_width=True, on_click=update_duration, args=(1.5,))
-            with b4: st.button("⏱️ 2 ساعتين", use_container_width=True, on_click=update_duration, args=(2.0,))
+            with b1: st.button("⏱️ 30 د", use_container_width=True, key="btn_30m", on_click=update_duration_callback, args=(0.5,))
+            with b2: st.button("⏱️ 1 ساعة", use_container_width=True, key="btn_1h", on_click=update_duration_callback, args=(1.0,))
+            with b3: st.button("⏱️ 1.5 س", use_container_width=True, key="btn_15h", on_click=update_duration_callback, args=(1.5,))
+            with b4: st.button("⏱️ 2 ساعتين", use_container_width=True, key="btn_2h", on_click=update_duration_callback, args=(2.0,))
     else:
         c1, c2, c3 = st.columns([2, 1.5, 1.5])
         with c1:
@@ -196,10 +202,10 @@ if page == "📥 تسجيل نشاط جديد":
             duration_hours = st.number_input("المدة (بالساعات)", min_value=0.1, max_value=24.0, step=0.05, key="duration_input")
             st.caption("⏱️ أزرار تعيين الوقت السريعة:")
             b1, b2, b3, b4 = st.columns(4)
-            with b1: st.button("⏱️ 30 د", use_container_width=True, key="m1", on_click=update_duration, args=(0.5,))
-            with b2: st.button("⏱️ 1 ساعة", use_container_width=True, key="m2", on_click=update_duration, args=(1.0,))
-            with b3: st.button("⏱️ 1.5 س", use_container_width=True, key="m3", on_click=update_duration, args=(1.5,))
-            with b4: st.button("⏱️ 2 ساعتين", use_container_width=True, key="m4", on_click=update_duration, args=(2.0,))
+            with b1: st.button("⏱️ 30 د", use_container_width=True, key="m1", on_click=update_duration_callback, args=(0.5,))
+            with b2: st.button("⏱️ 1 ساعة", use_container_width=True, key="m2", on_click=update_duration_callback, args=(1.0,))
+            with b3: st.button("⏱️ 1.5 س", use_container_width=True, key="m3", on_click=update_duration_callback, args=(1.5,))
+            with b4: st.button("⏱️ 2 ساعتين", use_container_width=True, key="m4", on_click=update_duration_callback, args=(2.0,))
             activity_notes = st.text_input("✍️ ملاحظات وتعليقات على النشاط (اختياري):", placeholder="مثال: مراجعة شيفرة التطبيق")
         with c2:
             target_date = st.date_input("اختر التاريخ من التقويم 📅", value=now.date())
@@ -257,11 +263,11 @@ if page == "📥 تسجيل نشاط جديد":
             st.cache_data.clear() 
             st.session_state.db = load_data()
             st.session_state.elapsed_time = 0
-            st.session_state.duration_input = 1.0 # تصفير حقل المدة بعد الحفظ الناجح
-            st.toast(f"✅ تم حفظ النشاط مباشرة وبنجاح!", icon="🚀")
+            st.session_state.duration_input = 1.0 # إعادة التصفير للحالة الافتراضية
+            st.toast(f"✅ تم حفظ السطر الجديد مباشرة في Google Sheet بنجاح!", icon="🚀")
             st.rerun()
         except Exception as e:
-            st.error(f"فشل الحفظ: {e}")
+            st.error(f"فشل حفظ البيانات المباشر: {e}")
 
     if not df_db.empty:
         st.markdown("---")
@@ -289,6 +295,7 @@ if page == "📥 تسجيل نشاط جديد":
                 st.session_state.db = df_db
                 st.toast("تم حذف الأنشطة المحددة بنجاح!", icon="🗑️")
                 st.rerun()
+
 
 # ==========================================
 # 2. صفحة لوحة التحكم والإحصاءات (Lazy Evaluation)
@@ -425,7 +432,7 @@ elif page == "📊 لوحة التحكم والإحصاءات":
             if not day_data.empty:
                 val = day_data['الساعات'].values[0]
                 row_z.append(val)
-                row_text.append(f"التاريخ: {day_data['تاريخ_يومي_مختصر'].values[0]}<br>الإنجاز: {val} ساعة")
+                row_text.append(f"التاريخ: {day_data['تاريخ_يومي_مختصر'].values[0]}<br>الإنجاز: {val} hour")
             else: row_z.append(0); row_text.append("")
         z_matrix.append(row_z); text_matrix.append(row_text)
 
