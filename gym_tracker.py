@@ -94,6 +94,7 @@ try:
 except Exception as e:
     st.error(f"تنبيه قاعدة البيانات: {e}")
 
+# ✨ [تحسين برمي وأمني: Smart Caching مع تصفير ذكي]
 @st.cache_data(ttl=600)
 def load_data():
     try:
@@ -118,6 +119,7 @@ def save_data(df):
         if sheet.row_count < len(clean_df) + 10:
             sheet.add_rows(len(clean_df) + 20)
         set_with_dataframe(sheet, clean_df, include_index=False, include_column_header=True, resize=True)
+        # تصفير ذكي وفوري للـ Cache لضمان تحديث البيانات المسحوبة في الثواني التالية
         st.cache_data.clear()
     except Exception as e:
         st.error(f"حدث خطأ أثناء حفظ البيانات: {e}")
@@ -144,7 +146,7 @@ else:
     df_db_calc["date_only"] = pd.Series(dtype='object')
 
 # ==========================================
-# 🧭 نظام القوائم الجانبية المتقدمة (الأهداف الذكية)
+# 🧭 نظام القوائم الجانبية المتقدمة
 # ==========================================
 st.sidebar.title("🧭 قائمة التنقل")
 page = st.sidebar.radio("اختر الصفحة:", ["📥 تسجيل نشاط جديد", "📊 لوحة التحكم والإحصاءات"])
@@ -164,6 +166,29 @@ def render_duration_section(col_context):
         b2.button("⏱️ 1 س", key="b1h", on_click=set_duration, args=(1.0,), use_container_width=True)
         b3.button("⏱️ 1.5 س", key="b15", on_click=set_duration, args=(1.5,), use_container_width=True)
         b4.button("⏱️ 2 س", key="b2h", on_click=set_duration, args=(2.0,), use_container_width=True)
+
+# ✨ [تحسين أمني: دالة الحذف المؤكد النافذة - Confirmation Dialog]
+@st.dialog("⚠️ تأكيد عملية الحذف")
+def confirm_delete_dialog(indices, is_all=False):
+    if is_all:
+        st.warning("🚨 هل أنت متأكد تماماً أنك تريد مسح السجل بالكامل؟ لا يمكن التراجع عن هذا الإجراء!")
+        if st.button("❌ نعم، امسح قاعدة البيانات بالكامل", type="primary", use_container_width=True):
+            sheet.clear()
+            sheet.append_row(COLUMNS[:9])
+            st.cache_data.clear()
+            st.session_state.db = pd.DataFrame(columns=COLUMNS)
+            st.success("تم تصفير السجل تماماً!")
+            time.sleep(1)
+            st.rerun()
+    else:
+        st.warning(f"هل أنت متأكد أنك تريد حذف الأنشطة المحددة (عددها: {len(indices)})؟")
+        if st.button("🗑️ تأكيد الحذف النهائي", type="primary", use_container_width=True):
+            updated_df = st.session_state.db.drop(indices).reset_index(drop=True)
+            save_data(updated_df)
+            st.session_state.db = updated_df
+            st.toast("تم الحذف بنجاح!", icon="🗑️")
+            time.sleep(1)
+            st.rerun()
 
 # ==========================================
 # 1. صفحة: تسجيل نشاط جديد
@@ -350,12 +375,9 @@ if page == "📥 تسجيل نشاط جديد":
         
         indices_to_delete = edited_display[edited_display['حذف؟'] == True].index
         if len(indices_to_delete) > 0:
-            if st.button("🗑️ تأكيد حذف الأنشطة المحددة", type="primary"):
-                df_db = df_db.drop(indices_to_delete).reset_index(drop=True)
-                save_data(df_db)
-                st.session_state.db = df_db
-                st.toast("تم حذف الأنشطة المحددة بنجاح!", icon="🗑️")
-                st.rerun()
+            # ✨ استدعاء النافذة المنبثقة للتأكيد قبل الحذف
+            if st.button("🗑️ حذف الأنشطة المحددة", type="primary"):
+                confirm_delete_dialog(indices_to_delete, is_all=False)
 
         st.markdown("---")
         buffer = io.BytesIO()
@@ -368,13 +390,9 @@ if page == "📥 تسجيل نشاط جديد":
         st.download_button(label="📥 تحميل سجل تمارينك كملف Excel النظيف", data=buffer.getvalue(), file_name="my_gym_activities.xlsx", mime="application/vnd.ms-excel", use_container_width=True)
         
         st.markdown("---")
+        # ✨ استدعاء النافذة المنبثقة للتأكيد قبل مسح السجل بالكامل
         if st.button("🚨 مسح السجل بالكامل والبدء من جديد"):
-            sheet.clear()
-            sheet.append_row(COLUMNS[:9])
-            st.cache_data.clear()
-            st.session_state.db = pd.DataFrame(columns=COLUMNS)
-            st.success("تم تصفير قاعدة البيانات بنجاح!")
-            st.rerun()
+            confirm_delete_dialog(None, is_all=True)
 
 # ==========================================
 # 2. صفحة: لوحة التحكم والإحصاءات
@@ -382,14 +400,12 @@ if page == "📥 تسجيل نشاط جديد":
 elif page == "📊 لوحة التحكم والإحصاءات":
     st.header("📊 لوحة التحكم والأداء العام")
     
-    # 🔍 ✨ [إضافة ميزة الفلترة المتقدمة للنطاقات الزمنية]
     st.subheader("🔍 فلترة التحليلات حسب النطاق الزمني")
     time_filter = st.selectbox(
         "اختر الفترة الزمنية لتحديث كافة التحليلات والرسومات:",
         ["🔄 السجل بالكامل (كل البيانات)", "📅 اليوم", "📆 هذا الأسبوع", "🗓️ هذا الشهر", "🚀 آخر 90 يوماً", "✏️ نطاق مخصص..."]
     )
     
-    # تحديد تواريخ البداية والنهاية بناء على الفلتر لتصفية قاعدة البيانات
     start_filter_date = None
     end_filter_date = today_date
     
@@ -408,22 +424,18 @@ elif page == "📊 لوحة التحكم والإحصاءات":
         with c_date2:
             end_filter_date = st.date_input("إلى تاريخ:", value=today_date)
 
-    # تطبيق الفلترة على نسخة الحسابات
     if start_filter_date is not None and not df_db_calc.empty:
         df_filtered = df_db_calc[(df_db_calc["date_only"] >= start_filter_date) & (df_db_calc["date_only"] <= end_filter_date)].copy()
     else:
         df_filtered = df_db_calc.copy()
 
-    # الحسابات الأساسية والإحصاءات الحيوية
     current_streak, best_streak = 0, 0
     today_hours, week_hours, month_hours, total_hours, activities_count = 0, 0, 0, 0, 0
     most_activity = "-"
 
-    # حساب الالتزام والسلاسل المتتالية (Streak) من كامل قاعدة البيانات لضمان دقتها دائماً
     if not df_db_calc.empty:
         unique_days = sorted(set(df_db_calc["date_only"].dropna()))
         
-        # 1. حساب السلسلة الحالية
         streak = 0
         check_day = today_date
         while check_day in unique_days:
@@ -431,7 +443,6 @@ elif page == "📊 لوحة التحكم والإحصاءات":
             check_day -= timedelta(days=1)
         current_streak = streak
 
-        # 2. ✨ [إضافة ميزة مؤشر أفضل وأطول سلسلة التزام متتالية - Longest Streak]
         best = 0
         temp = 1
         if len(unique_days) > 0:
@@ -444,20 +455,17 @@ elif page == "📊 لوحة التحكم والإحصاءات":
             best = max(best, temp)
         best_streak = best
 
-        # حساب الساعات الفعلية لمقارنتها بالأهداف
         today_hours = round(df_db_calc[df_db_calc["date_only"] == today_date]["المدة_بالدقائق"].sum()/60, 1)
         start_week = today_date - timedelta(days=today_date.weekday())
         week_hours = round(df_db_calc[df_db_calc["date_only"] >= start_week]["المدة_بالدقائق"].sum()/60, 1)
         month_hours = round(df_db_calc[(pd.to_datetime(df_db_calc["date_only"]).dt.month == today_date.month) & (pd.to_datetime(df_db_calc["date_only"]).dt.year == today_date.year)]["المدة_بالدقائق"].sum()/60, 1)
 
-    # حساب المؤشرات بناء على النطاق المفلتر المختار حالياً
     if not df_filtered.empty:
         total_hours = round(df_filtered["المدة_بالدقائق"].sum()/60, 1)
         activities_count = len(df_filtered)
         if not df_filtered["النشاط"].dropna().empty:
             most_activity = df_filtered.groupby("النشاط")["المدة_بالدقائق"].sum().idxmax()
 
-    # نظام الإنجازات العام
     achievements = [
         ("🌱", "البداية الأولى", len(df_db_calc) >= 1),
         ("⏱️", "أول 10 ساعات", round(df_db_calc["المدة_بالدقائق"].sum()/60 if not df_db_calc.empty else 0) >= 10),
@@ -468,7 +476,6 @@ elif page == "📊 لوحة التحكم والإحصاءات":
         ("📋", "100 نشاط مسجل", len(df_db_calc) >= 100)
     ]
 
-    # عرض المؤشرات الرقمية
     st.markdown("### 📈 مؤشرات الأداء للفترة المحددة")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     c1.metric("🔥 السلسلة الحالية", f"{current_streak} يوم")
@@ -480,20 +487,19 @@ elif page == "📊 لوحة التحكم والإحصاءات":
 
     st.markdown("---")
     
-    # ✨ [إضافة نظام ومؤشرات الأهداف الذكية والنسب المئوية الدقيقة]
     st.subheader("🎯 رادار الأهداف الذكية ومعدلات الإنجاز")
     goal1, goal2, goal3 = st.columns(3)
     
     with goal1:
-        p_today = min(today_hours / DAILY_GOAL, 1.0)
+        p_today = min(today_hours / DAILY_GOAL, 1.0) if DAILY_GOAL > 0 else 0
         st.metric("🎯 الهدف اليومي", f"{today_hours:.1f} / {DAILY_GOAL} ساعة", f"{p_today*100:.0f}% من الهدف")
         st.progress(p_today)
     with goal2:
-        p_week = min(week_hours / WEEKLY_GOAL, 1.0)
+        p_week = min(week_hours / WEEKLY_GOAL, 1.0) if WEEKLY_GOAL > 0 else 0
         st.metric("📅 الهدف الأسبوعي", f"{week_hours:.1f} / {WEEKLY_GOAL} ساعة", f"{p_week*100:.0f}% من الهدف")
         st.progress(p_week)
     with goal3:
-        p_month = min(month_hours / MONTHLY_GOAL, 1.0)
+        p_month = min(month_hours / MONTHLY_GOAL, 1.0) if MONTHLY_GOAL > 0 else 0
         st.metric("🗓️ الهدف الشهري", f"{month_hours:.1f} / {MONTHLY_GOAL} ساعة", f"{p_month*100:.0f}% من الهدف")
         st.progress(p_month)
 
@@ -512,7 +518,6 @@ elif page == "📊 لوحة التحكم والإحصاءات":
         github_day_order = [6, 0, 1, 2, 3, 4, 5] 
         days_names = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
 
-        # يعرض المخطط السنوي الأنشطة مع تسليط الضوء بناء على الفلترة الزمنية المختارة لتلوينها
         if not df_filtered.empty:
             user_summary = df_filtered.groupby('تاريخ_يومي_مختصر')['المدة_بالدقائق'].sum().reset_index()
             user_summary['الساعات'] = user_summary['المدة_بالدقائق'] / 60
