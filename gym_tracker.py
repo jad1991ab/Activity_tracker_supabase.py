@@ -249,6 +249,40 @@ MONTHLY_GOAL = st.sidebar.number_input(L["g_monthly"], min_value=5.0, max_value=
 
 def render_duration_section(col_context):
     with col_context:
+        # 1. التحقق من وجود القيمة الافتراضية في الجلسة أو تعيينها
+        if "duration_val" not in st.session_state:
+            st.session_state.duration_val = 1.0
+            
+        # 2. عرض مربع الإدخال مع ربط قيمته (value) بمتغير الجلسة بدلاً من الـ key المباشر لمنع التعارض
+        duration_input = st.number_input(
+            L["duration_lbl"], 
+            min_value=0.1, 
+            max_value=24.0, 
+            step=0.1, 
+            value=float(st.session_state.duration_val)
+        )
+        
+        # تحديث الجلسة فوراً إذا قام المستخدم بالتغيير اليدوي عبر الأسهم
+        st.session_state.duration_val = duration_input
+        
+        st.caption(L["presets_lbl"])
+        b1, b2, b3, b4 = st.columns(4)
+        
+        # 3. عند الضغط على الأزرار السريعة يتم تحديث القيمة وعمل rerun آمن تماماً
+        if b1.button(L["m30"], key="b30", use_container_width=True): 
+            st.session_state.duration_val = 0.5
+            st.rerun()
+        if b2.button(L["h1"], key="b1h", use_container_width=True): 
+            st.session_state.duration_val = 1.0
+            st.rerun()
+        if b3.button(L["h15"], key="b15", use_container_width=True): 
+            st.session_state.duration_val = 1.5
+            st.rerun()
+        if b4.button(L["h2"], key="b2h", use_container_width=True): 
+            st.session_state.duration_val = 2.0
+            st.rerun()
+            
+    with col_context:
         # حل مشكلة تعديل الـ widget: ربط القيمة بمتغير ديناميكي مستقل
         st.number_input(L["duration_lbl"], min_value=0.1, max_value=24.0, step=0.1, key="duration_val")
         st.caption(L["presets_lbl"])
