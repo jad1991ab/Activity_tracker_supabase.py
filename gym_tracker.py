@@ -58,13 +58,12 @@ def load_users_db():
     except:
         return pd.DataFrame(columns=["Username", "Password", "Role"])
 
-# دالة ذكية ومحدثة لإصلاح تواريخ وساعات جوجل شيت المشوهة (Serial Numbers) بدون قيود على الطول
+# دالة ذكية ومحدثة لإصلاح تواريخ وساعات جوجل شيت المشوهة
 def fix_google_serial_date(val, is_time_only=False):
     if not val or pd.isna(val):
         return ""
     val_str = str(val).strip()
     
-    # تنظيف التحقق الرقمي ليشمل الأرقام العشرية الطويلة جداً الموضحة في صورة image_9c997f.png
     clean_numeric_check = val_str.replace('.', '', 1).replace('-', '', 1)
     if clean_numeric_check.isdigit():
         try:
@@ -73,7 +72,6 @@ def fix_google_serial_date(val, is_time_only=False):
             converted_dt = base_date + datetime.timedelta(days=serial_num)
             
             if is_time_only:
-                # إذا كان الرقم يمثل كسر اليوم العشري فقط (الساعة)
                 if serial_num < 1:
                     total_seconds = int(serial_num * 86400)
                     hours = total_seconds // 3600
@@ -101,7 +99,6 @@ def load_data():
             if col not in df.columns: 
                 df[col] = ""
         
-        # تطبيق الإصلاح الجذري على الأعمدة المتضررة
         if 'التاريخ' in df.columns:
             df['التاريخ'] = df['التاريخ'].apply(lambda x: fix_google_serial_date(x, is_time_only=False))
         if 'الساعة' in df.columns:
@@ -132,7 +129,7 @@ def save_data(df):
         st.error(f"⚠️ فشل الاتصال بجوجل شيتس. جاري تفعيل الحفظ الاحتياطي المحلي لتجنب فقدان البيانات.")
         return False
 
-# أدوات التخزين المؤقت المحلي (Offline Cache Handles)
+# أدوات التخزين المؤقت المحلي
 def cache_offline_activity(row_dict):
     cached_data = []
     if os.path.exists(OFFLINE_CACHE_FILE):
@@ -188,7 +185,8 @@ LEXICON = {
         "grid_sub": "🧱 مخطط الالتزام السنوي المفلتر (GitHub Grid)", "pie_sub": "🍕 التوزيع النظري للأنشطة", "pie_empty": "لا توجد أنشطة مسجلة في هذا النطاق الزمني لعرض توزيعها.",
         "gym_def": "الدراسة 📚", "study_def": "النادي 🏋️‍♂️", "work_def": "العمل 💼", "custom_err": "يرجى كتابة اسم النشاط المخصص أولاً!",
         "login_title": "🔒 نظام تسجيل الدخول الموحد", "username_lbl": "اسم المستخدم", "password_lbl": "كلمة المرور", "login_btn": "🚪 تسجيل الدخول", "logout_btn": "🚪 تسجيل الخروج", "invalid_login": "❌ اسم المستخدم أو كلمة المرور غير صحيحة",
-        "admin_scope": "🔍 استعراض بيانات مستخدم محدد (نطاق المدير):", "all_users_opt": "👥 كل المستخدمين معاً", "create_user_sub": "➕ إنشاء حساب مستخدم جديد", "new_user_lbl": "اسم المستخدم الجديد", "new_pass_lbl": "كلمة المرور الجديدة", "role_lbl": "الصلاحية", "create_btn": "💼 إنشاء الحساب وحفظه برمز مشفر"
+        "admin_scope": "🔍 استعراض بيانات مستخدم محدد (نطاق المدير):", "all_users_opt": "👥 كل المستخدمين معاً", "create_user_sub": "➕ إنشاء حساب مستخدم جديد", "new_user_lbl": "اسم المستخدم الجديد", "new_pass_lbl": "كلمة المرور الجديدة", "role_lbl": "الصلاحية", "create_btn": "💼 إنشاء الحساب وحفظه برمز مشفر",
+        "gam_level": "المستوى", "gam_xp": "نقاط الخبرة", "gam_leaderboard": "🏆 لوحة الصدارة (هذا الأسبوع)", "gam_rank": "الترتيب", "gam_badges": "🏅 الشارات الرقمية والميداليات"
     },
     "EN": {
         "nav_title": "🧭 Navigation", "page_log": "📥 Log New Activity", "page_dash": "📊 Analytics Dashboard", "page_admin": "👑 Users & Identity Administration",
@@ -210,7 +208,8 @@ LEXICON = {
         "grid_sub": "🧱 Annual Consistency Grid", "pie_sub": "🍕 Allocation Distribution", "pie_empty": "No distribution entries found inside current evaluation range.",
         "gym_def": "Studying 📚", "study_def": "Gym 🏋️‍♂️", "work_def": "Work 💼", "custom_err": "Please enter a custom activity label first!",
         "login_title": "🔒 Secure Unified Login System", "username_lbl": "Username", "password_lbl": "Password", "login_btn": "🚪 Sign In", "logout_btn": "🚪 Log Out", "invalid_login": "❌ Invalid Username or Password",
-        "admin_scope": "🔍 Review specific user logs (Admin Scope):", "all_users_opt": "👥 All Users Combined", "create_user_sub": "➕ Create New User Account", "new_user_lbl": "New Username", "new_pass_lbl": "New Password", "role_lbl": "Role", "create_btn": "💼 Register Encrypted User Account"
+        "admin_scope": "🔍 Review specific user logs (Admin Scope):", "all_users_opt": "👥 All Users Combined", "create_user_sub": "➕ Create New User Account", "new_user_lbl": "New Username", "new_pass_lbl": "New Password", "role_lbl": "Role", "create_btn": "💼 Register Encrypted User Account",
+        "gam_level": "Level", "gam_xp": "Experience Points", "gam_leaderboard": "🏆 Leaderboard (This Week)", "gam_rank": "Rank", "gam_badges": "🏅 Digital Badges & Medals"
     }
 }
 
@@ -248,7 +247,32 @@ if not st.session_state.logged_in:
 
 df_db_all = load_data()
 
+# حساب بيانات الـ Gamification للمستخدم الحالي بشكل ديناميكي
+user_all_logs = df_db_all[df_db_all["المستخدم"] == st.session_state.username].copy() if not df_db_all.empty else pd.DataFrame()
+user_total_hours = 0.0
+if not user_all_logs.empty:
+    user_all_logs['المدة_بالدقائق'] = pd.to_numeric(user_all_logs['المدة_بالدقائق'], errors='coerce').fillna(0)
+    user_total_hours = float(user_all_logs['المدة_بالدقائق'].sum() / 60)
+
+# معادلة حساب الـ XP والمستويات: كل ساعة تركيز تعطي 100 XP
+# كل مستوى يحتاج (المستوى الحالي * 500 XP) للصعود
+total_xp = int(user_total_hours * 100)
+current_level = 1
+xp_needed = 500
+temp_xp = total_xp
+
+while temp_xp >= xp_needed:
+    temp_xp -= xp_needed
+    current_level += 1
+    xp_needed = current_level * 500
+
+progress_to_next_level = float(temp_xp / xp_needed) if xp_needed > 0 else 0.0
+
+# عرض معلومات المستوى في الشريط الجانبي (Sidebar)
 st.sidebar.markdown(f"#### 👤 {st.session_state.username} ({st.session_state.user_role})")
+st.sidebar.markdown(f"**⭐ {L['gam_level']} {current_level}** ({total_xp} XP)")
+st.sidebar.progress(progress_to_next_level)
+
 if st.sidebar.button(L["logout_btn"], type="secondary", use_container_width=True):
     st.session_state.logged_in = False
     st.session_state.username = ""
@@ -329,7 +353,7 @@ else:
     df_db_calc["date_only"] = pd.Series(dtype='object')
 
 # ==========================================
-# 1. شاشة تسجيل الأنشطة (بدون نظام ساعة الإيقاف)
+# 1. شاشة تسجيل الأنشطة
 # ==========================================
 if page == L["page_log"]:
     st.header(L["log_header"])
@@ -463,7 +487,7 @@ if page == L["page_log"]:
         if st.button(L["wipe_all_trigger"]): confirm_delete_dialog(None, is_all=True)
 
 # ==========================================
-# 2. شاشة الإحصاءات والرسوم البيانية
+# 2. شاشة الإحصاءات والرسوم البيانية (تتضمن الألعاب ولوحة الصدارة)
 # ==========================================
 elif page == L["page_dash"]:
     st.header(L["dash_header"])
@@ -529,6 +553,52 @@ elif page == L["page_dash"]:
     c4.metric(L["metric_entries"], activities_count)
     c5.metric(L["metric_today_vol"], f"{today_hours} {L['hours_unit']}")
     c6.metric(L["metric_dominant"], most_activity)
+
+    st.markdown("---")
+    
+    # قسم الألعاب والتشجيع المطور (Gamification Component)
+    st.subheader(L["gam_badges"])
+    badge_col1, badge_col2 = st.columns([1, 1])
+    
+    with badge_col1:
+        st.markdown(f"#### 🏆 {L['gam_level']} {current_level} (إجمالي: {total_xp} XP)")
+        # التحقق من شارات الالتزام واستعراض الميداليات ديناميكياً
+        badges_earned = []
+        if user_total_hours >= 100:
+            badges_earned.append("🎖️ **تخطي 100 ساعة عمل:** دليل على التفاني والالتزام العميق الساحق.")
+        if best_streak >= 7:
+            badges_earned.append("🔥 **التزام 7 أيام متتالية (Streak):** ثبات أسطوري متواصل لأسبوع كامل.")
+        if user_total_hours >= 10:
+            badges_earned.append("🌱 **الانطلاقة الأولى:** إكمال أول 10 ساعات عمل داخل المنصة.")
+            
+        if badges_earned:
+            for b in badges_earned:
+                st.success(b)
+        else:
+            st.info("تابع التسجيل بانتظام لفتح الشارات والميداليات الرقمية قريباً! 🎯")
+
+    with badge_col2:
+        st.markdown(f"#### {L['gam_leaderboard']}")
+        if not df_db_all.empty:
+            df_lb = df_db_all.copy()
+            df_lb['parsed_date'] = pd.to_datetime(df_lb['التاريخ'], errors='coerce')
+            start_current_week = today_date - timedelta(days=today_date.weekday())
+            
+            # فلترة سجل الأسبوع الحالي لجميع المستخدمين
+            df_lb_week = df_lb[df_lb['parsed_date'].dt.date >= start_current_week].copy()
+            if not df_lb_week.empty:
+                df_lb_week['المدة_بالدقائق'] = pd.to_numeric(df_lb_week['المدة_بالدقائق'], errors='coerce').fillna(0)
+                leaderboard_df = df_lb_week.groupby('المستخدم')['المدة_بالدقائق'].sum().reset_index()
+                leaderboard_df['ساعات الالتزام'] = round(leaderboard_df['المدة_بالدقائق'] / 60, 1)
+                leaderboard_df = leaderboard_df.sort_values(by='ساعات الالتزام', ascending=False).reset_index(drop=True)
+                leaderboard_df.index += 1
+                leaderboard_df = leaderboard_df.rename_axis(L["gam_rank"]).reset_index()
+                
+                st.dataframe(leaderboard_df[[L["gam_rank"], 'المستخدم', 'ساعات الالتزام']], use_container_width=True, hide_index=True)
+            else:
+                st.write("لا توجد سجلات كافية لبناء لوحة الصدارة لهذا الأسبوع حتى الآن.")
+        else:
+            st.write("قاعدة البيانات فارغة حالياً.")
 
     st.markdown("---")
     st.subheader(L["radar_sub"])
