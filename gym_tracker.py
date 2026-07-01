@@ -58,7 +58,7 @@ def load_users_db():
     except:
         return pd.DataFrame(columns=["Username", "Password", "Role"])
 
-# دالة ذكية ومحدثة لإصلاح تواريخ وساعات جوجل شيت المشوهة
+# دالة ذكية ومحدثة لإصلاح تواريخ وساعات جوجل شيت ومنع التناقض والتداخل
 def fix_google_serial_date(val, is_time_only=False):
     if not val or pd.isna(val):
         return ""
@@ -69,18 +69,23 @@ def fix_google_serial_date(val, is_time_only=False):
         try:
             serial_num = float(val_str)
             base_date = datetime.datetime(1899, 12, 30)
-            converted_dt = base_date + datetime.timedelta(days=serial_num)
             
             if is_time_only:
+                # عزل الجزء العشري فقط لحساب الوقت النقي
                 if serial_num < 1:
-                    total_seconds = int(serial_num * 86400)
-                    hours = total_seconds // 3600
-                    minutes = (total_seconds % 3600) // 60
-                    seconds = total_seconds % 60
-                    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                return converted_dt.strftime('%H:%M:%S')
+                    fraction = serial_num
+                else:
+                    fraction = serial_num - int(serial_num)
+                total_seconds = int(round(fraction * 86400))
+                hours = total_seconds // 3600
+                minutes = (total_seconds % 3600) // 60
+                seconds = total_seconds % 60
+                return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
             else:
-                return converted_dt.strftime('%Y-%m-%d %H:%M:%S')
+                # عزل الجزء الصحيح فقط لاستخراج التاريخ النقي بدون أي ساعات زائدة
+                days_to_add = int(serial_num)
+                converted_dt = base_date + datetime.timedelta(days=days_to_add)
+                return converted_dt.strftime('%Y-%m-%d')
         except:
             pass
     return val_str
@@ -99,12 +104,18 @@ def load_data():
             if col not in df.columns: 
                 df[col] = ""
         
+        # تطبيق المعالجة المنفصلة والدقيقة لمنع تكرار تداخل الساعات مع التاريخ
         if 'التاريخ' in df.columns:
             df['التاريخ'] = df['التاريخ'].apply(lambda x: fix_google_serial_date(x, is_time_only=False))
         if 'الساعة' in df.columns:
             df['الساعة'] = df['الساعة'].apply(lambda x: fix_google_serial_date(x, is_time_only=True))
                 
-        return df[COLUMNS]
+        # فرز السجلات برمجياً من الأحدث للأقدم لضمان اتساق الواجهات
+        if 'التاريخ' in df.columns and 'الساعة' in df.columns:
+            df['datetime_helper'] = pd.to_datetime(df['التاريخ'] + ' ' + df['الساعة'], errors='coerce')
+            df = df.sort_values(by='datetime_helper', ascending=False).drop(columns=['datetime_helper'])
+            
+        return df[COLUMNS].reset_index(drop=True)
     except Exception as e:
         return pd.DataFrame(columns=COLUMNS)
 
@@ -247,7 +258,7 @@ if not st.session_state.logged_in:
 
 df_db_all = load_data()
 
-# حساب بيانات الـ Gamification للمستخدم الحالي بشكل ديناميكي
+# حساب بيانات الـ Gamification للمستخدم الحالي ديناميكياً
 user_all_logs = df_db_all[df_db_all["المستخدم"] == st.session_state.username].copy() if not df_db_all.empty else pd.DataFrame()
 user_total_hours = 0.0
 if not user_all_logs.empty:
@@ -255,7 +266,6 @@ if not user_all_logs.empty:
     user_total_hours = float(user_all_logs['المدة_بالدقائق'].sum() / 60)
 
 # معادلة حساب الـ XP والمستويات: كل ساعة تركيز تعطي 100 XP
-# كل مستوى يحتاج (المستوى الحالي * 500 XP) للصعود
 total_xp = int(user_total_hours * 100)
 current_level = 1
 xp_needed = 500
@@ -268,7 +278,7 @@ while temp_xp >= xp_needed:
 
 progress_to_next_level = float(temp_xp / xp_needed) if xp_needed > 0 else 0.0
 
-# عرض معلومات المستوى في الشريط الجانبي (Sidebar)
+# عرض معلومات المستوى ونقاط الخبرة في الشريط الجانبي
 st.sidebar.markdown(f"#### 👤 {st.session_state.username} ({st.session_state.user_role})")
 st.sidebar.markdown(f"**⭐ {L['gam_level']} {current_level}** ({total_xp} XP)")
 st.sidebar.progress(progress_to_next_level)
@@ -422,12 +432,12 @@ if page == L["page_log"]:
         new_row = {
             'ID': int(datetime.datetime.now().timestamp() * 1000),
             'المستخدم': st.session_state.username,
-            'التاريخ': combined_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+            'التاريخ': combined_datetime.strftime('%Y-%m-%d'),
             'السنة': int(combined_datetime.year),
             'الشهر': str(months_list[combined_datetime.month - 1]),
             'الأسبوع': int(combined_datetime.isocalendar().week),
             'اليوم': str(combined_datetime.strftime('%A')),
-            'الساعة': str(combined_datetime.strftime('%H:%M')),
+            'الساعة': str(combined_datetime.strftime('%H:%M:%S')),
             'النشاط': str(final_activity),
             'المدة_بالدقائق': duration_minutes,
             'الملاحظات': str(activity_notes.strip())
@@ -487,7 +497,7 @@ if page == L["page_log"]:
         if st.button(L["wipe_all_trigger"]): confirm_delete_dialog(None, is_all=True)
 
 # ==========================================
-# 2. شاشة الإحصاءات والرسوم البيانية (تتضمن الألعاب ولوحة الصدارة)
+# 2. شاشة الإحصاءات والرسوم البيانية (لوحة التحكم والألعاب)
 # ==========================================
 elif page == L["page_dash"]:
     st.header(L["dash_header"])
@@ -556,20 +566,19 @@ elif page == L["page_dash"]:
 
     st.markdown("---")
     
-    # قسم الألعاب والتشجيع المطور (Gamification Component)
+    # قسم الألعاب والتشجيع المطور (Gamification)
     st.subheader(L["gam_badges"])
     badge_col1, badge_col2 = st.columns([1, 1])
     
     with badge_col1:
         st.markdown(f"#### 🏆 {L['gam_level']} {current_level} (إجمالي: {total_xp} XP)")
-        # التحقق من شارات الالتزام واستعراض الميداليات ديناميكياً
         badges_earned = []
         if user_total_hours >= 100:
-            badges_earned.append("🎖️ **تخطي 100 ساعة عمل:** دليل على التفاني والالتزام العميق الساحق.")
+            badges_earned.append("🎖️ **شارة تخطي 100 ساعة عمل:** دليل على التفاني والالتزام العميق الساحق.")
         if best_streak >= 7:
-            badges_earned.append("🔥 **التزام 7 أيام متتالية (Streak):** ثبات أسطوري متواصل لأسبوع كامل.")
+            badges_earned.append("🔥 **شارة التزام 7 أيام متتالية:** ثبات أسطوري متواصل لأسبوع كامل.")
         if user_total_hours >= 10:
-            badges_earned.append("🌱 **الانطلاقة الأولى:** إكمال أول 10 ساعات عمل داخل المنصة.")
+            badges_earned.append("🌱 **شارة الانطلاقة الأولى:** إكمال أول 10 ساعات عمل داخل المنصة بنجاح.")
             
         if badges_earned:
             for b in badges_earned:
@@ -584,7 +593,7 @@ elif page == L["page_dash"]:
             df_lb['parsed_date'] = pd.to_datetime(df_lb['التاريخ'], errors='coerce')
             start_current_week = today_date - timedelta(days=today_date.weekday())
             
-            # فلترة سجل الأسبوع الحالي لجميع المستخدمين
+            # فلترة سجل الأسبوع الحالي لجميع المستخدمين لبناء لوحة الصدارة المجموعاتية
             df_lb_week = df_lb[df_lb['parsed_date'].dt.date >= start_current_week].copy()
             if not df_lb_week.empty:
                 df_lb_week['المدة_بالدقائق'] = pd.to_numeric(df_lb_week['المدة_بالدقائق'], errors='coerce').fillna(0)
