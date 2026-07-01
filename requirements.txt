@@ -2,6 +2,6 @@ streamlit
 pandas
 pip install supabase
 google-auth
-gspread-dataframe
 openpyxl
 plotly
+supabase
