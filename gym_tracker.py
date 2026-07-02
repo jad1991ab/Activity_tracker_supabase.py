@@ -1,22 +1,24 @@
+# في أعلى ملفك، استبدل تعريف now القديم بهذا:
 from streamlit_javascript import st_javascript
 from datetime import datetime
 import pytz
 
-# جلب المنطقة الزمنية للمستخدم
-user_timezone = st_javascript("Intl.DateTimeFormat().resolvedOptions().timeZone")
+if 'user_now' not in st.session_state:
+    user_timezone = st_javascript("Intl.DateTimeFormat().resolvedOptions().timeZone")
+    if user_timezone:
+        try:
+            tz = pytz.timezone(user_timezone)
+            st.session_state.user_now = datetime.now(tz)
+        except:
+            st.session_state.user_now = datetime.now()
+    else:
+        st.session_state.user_now = datetime.now()
 
-# ضبط الوقت بناءً على توقيت المستخدم
-if user_timezone:
-    try:
-        tz = pytz.timezone(user_timezone)
-        now = datetime.now(tz)
-    except:
-        now = datetime.now()
-else:
-    now = datetime.now()
-
+# الآن استخدم هذا المتغير في كل مكان في الكود:
+now = st.session_state.user_now
 today_date = now.date()
 current_year = now.year
+
 
 import streamlit as st
 import pandas as pd
@@ -300,8 +302,7 @@ def confirm_delete_dialog(ids_to_delete=None, is_all=False):
                 st.error(f"فشلت عملية الحذف: {e}")
 
 
-today_date = now.date()
-current_year = now.year
+
 
 if not df_db.empty:
     df_db_calc = df_db.copy()
