@@ -35,7 +35,7 @@ def get_supabase_client() -> Client:
 supabase = get_supabase_client()
 
 # الهيكل الثابت للأعمدة (بالإنجليزية لتتوافق مع Supabase)
-COLUMNS = ['id', 'username', 'activity_date', 'year', 'month', 'week', 'weekday', 'activity_time', 'activity_name', 'duration_minutes', 'notes']
+COLUMNS = ['id', 'username', 'activity_date', 'activity_time', 'activity_name', 'duration_minutes', 'notes']
 
 # --------------------------------------------------
 # 🔒 دالات إدارة المستخدمين ونظام تسجيل الدخول (آمن وموسع)
@@ -342,10 +342,7 @@ if page == L["page_log"]:
         new_row_data = {
             'username': st.session_state.username,
             'activity_date': combined_datetime.strftime('%Y-%m-%d'),
-            'year': int(combined_datetime.year),
-            'month': str(months_list[combined_datetime.month - 1]),
-            'week': int(combined_datetime.isocalendar().week),
-            'weekday': str(combined_datetime.strftime('%A')),
+            
             'activity_time': combined_datetime.strftime('%H:%M:%S'),
             'activity_name': str(final_activity),
             'duration_minutes': duration_minutes,
