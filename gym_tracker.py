@@ -10,8 +10,12 @@ import plotly.graph_objects as go
 import plotly.express as px
 import streamlit.components.v1 as components
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 # استدعاء مكتبة Supabase الرسمية
 from supabase import create_client, Client
+
+# المنطقة الزمنية المحلية لجهاز المستخدم (يتم استخدامها لتصحيح عمود created_at في Supabase)
+LOCAL_TZ = ZoneInfo("Europe/Stockholm")
 
 # تهيئة الصفحة الرسمية للتطبيق
 st.set_page_config(page_title="Activity Tracker Multi-User", layout="wide", page_icon="🟢")
@@ -337,7 +341,9 @@ if page == L["page_log"]:
             'activity_time': combined_datetime.strftime('%H:%M:%S'),
             'activity_name': str(final_activity),
             'duration_minutes': duration_minutes,
-            'notes': str(activity_notes.strip())
+            'notes': str(activity_notes.strip()),
+            # تصحيح التوقيت المسجل في عمود created_at ليطابق التوقيت المحلي لجهازك بدلاً من توقيت السيرفر الافتراضي (UTC)
+            'created_at': datetime.datetime.now(LOCAL_TZ).isoformat()
         }
         
         try:
