@@ -4,5 +4,3 @@ google-auth
 openpyxl
 plotly
 supabase
-streamlit-javascript
-pytz
