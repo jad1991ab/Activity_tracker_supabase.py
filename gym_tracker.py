@@ -1,9 +1,7 @@
 
-
-
 import streamlit as st
 import pandas as pd
-
+import datetime
 import io
 import time
 import json
@@ -15,37 +13,6 @@ import streamlit.components.v1 as components
 from datetime import timedelta
 # استدعاء مكتبة Supabase الرسمية
 from supabase import create_client, Client
-
-import subprocess
-import sys
-
-# تثبيت المكتبة تلقائياً إذا لم تكن موجودة
-try:
-    import streamlit_javascript
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "streamlit-javascript"])
-
-# في أعلى ملفك، استبدل تعريف now القديم بهذا:
-from streamlit_javascript import st_javascript
-from datetime import datetime
-import pytz
-
-if 'user_now' not in st.session_state:
-    user_timezone = st_javascript("Intl.DateTimeFormat().resolvedOptions().timeZone")
-    if user_timezone:
-        try:
-            tz = pytz.timezone(user_timezone)
-            st.session_state.user_now = datetime.now(tz)
-        except:
-            st.session_state.user_now = datetime.now()
-    else:
-        st.session_state.user_now = datetime.now()
-
-# الآن استخدم هذا المتغير في كل مكان في الكود:
-now = st.session_state.user_now
-today_date = now.date()
-current_year = now.year
-
 
 # تهيئة الصفحة الرسمية للتطبيق
 st.set_page_config(page_title="Activity Tracker Multi-User", layout="wide", page_icon="🟢")
@@ -301,8 +268,9 @@ def confirm_delete_dialog(ids_to_delete=None, is_all=False):
             except Exception as e:
                 st.error(f"فشلت عملية الحذف: {e}")
 
-
-
+now = datetime.datetime.now()
+today_date = now.date()
+current_year = now.year
 
 if not df_db.empty:
     df_db_calc = df_db.copy()
