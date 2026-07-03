@@ -342,8 +342,8 @@ if page == L["page_log"]:
             'activity_name': str(final_activity),
             'duration_minutes': duration_minutes,
             'notes': str(activity_notes.strip()),
-            # تصحيح التوقيت المسجل في عمود created_at ليطابق التوقيت المحلي لجهازك بدلاً من توقيت السيرفر الافتراضي (UTC)
-            'created_at': datetime.datetime.now(LOCAL_TZ).isoformat()
+            # تصحيح التوقيت المسجل في عمود created_at ليطابق التوقيت المحلي لجهازك (بدون تحويل تلقائي لتوقيت UTC من واجهة Supabase)
+            'created_at': datetime.datetime.now(LOCAL_TZ).replace(tzinfo=None).isoformat()
         }
         
         try:
