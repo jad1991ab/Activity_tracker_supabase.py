@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import datetime
@@ -289,7 +288,6 @@ else:
 if page == L["page_log"]:
     st.header(L["log_header"])
     st.subheader(L["form_sub"])
-    auto_time = st.toggle(L["form_auto"], value=True)
 
     default_activities = [L["gym_def"], L["study_def"], L["work_def"]]
     existing_activities = df_db_all['activity_name'].dropna().unique().tolist() if 'activity_name' in df_db_all.columns else []
@@ -301,25 +299,16 @@ if page == L["page_log"]:
     target_date = today_date
     chosen_time_str = now.strftime('%H:%M')
 
-    if auto_time:
-        st.info(f"📅 {today_date.strftime('%Y-%m-%d')}  |  ⏰ {now.strftime('%H:%M:%S')}  ({now.strftime('%A')})")
-        c1, c2 = st.columns(2)
-        with c1:
-            selected_activity = st.selectbox(L["act_cat"], activities_list, key="act_auto")
-            if selected_activity == L["act_custom_opt"]: custom_activity = st.text_input(L["act_custom_lbl"], key="cust_auto")
-            activity_notes = st.text_input(L["notes_lbl"], placeholder=L["notes_ph"], key="notes_auto")
-        render_duration_section(c2, key_prefix="auto_layout")
-    else:
-        c1, c2, c3 = st.columns([2, 1.5, 1.5])
-        with c1:
-            selected_activity = st.selectbox(L["act_cat"], activities_list, key="act_manual")
-            if selected_activity == L["act_custom_opt"]: custom_activity = st.text_input(L["act_custom_lbl"], key="cust_manual")
-            activity_notes = st.text_input(L["notes_lbl"], placeholder=L["notes_ph_manual"], key="notes_manual")
-        render_duration_section(c1, key_prefix="manual_layout")
-        with c2: target_date = st.date_input(L["cal_lbl"], value=today_date)
-        with c3:
-            picked_time = st.time_input(L["clock_lbl"], value=now.time(), key="manual_time_picker", step=60)
-            chosen_time_str = picked_time.strftime('%H:%M')
+    c1, c2, c3 = st.columns([2, 1.5, 1.5])
+    with c1:
+        selected_activity = st.selectbox(L["act_cat"], activities_list, key="act_manual")
+        if selected_activity == L["act_custom_opt"]: custom_activity = st.text_input(L["act_custom_lbl"], key="cust_manual")
+        activity_notes = st.text_input(L["notes_lbl"], placeholder=L["notes_ph_manual"], key="notes_manual")
+    render_duration_section(c1, key_prefix="manual_layout")
+    with c2: target_date = st.date_input(L["cal_lbl"], value=today_date)
+    with c3:
+        picked_time = st.time_input(L["clock_lbl"], value=now.time(), key="manual_time_picker", step=60)
+        chosen_time_str = picked_time.strftime('%H:%M')
 
     if st.button(L["submit_btn"], use_container_width=True, type="primary"):
         if selected_activity == L["act_custom_opt"]:
@@ -329,12 +318,10 @@ if page == L["page_log"]:
                 st.stop()
         else: final_activity = selected_activity
 
-        if auto_time: target_time = now.time()
-        else:
-            try:
-                t_parts = chosen_time_str.split(":")
-                target_time = datetime.time(int(t_parts[0]), int(t_parts[1]))
-            except: target_time = now.time()
+        try:
+            t_parts = chosen_time_str.split(":")
+            target_time = datetime.time(int(t_parts[0]), int(t_parts[1]))
+        except: target_time = now.time()
 
         combined_datetime = datetime.datetime.combine(target_date, target_time)
         duration_minutes = int(st.session_state.duration_val * 60)
